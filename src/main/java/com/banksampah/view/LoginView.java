@@ -73,7 +73,6 @@ public class LoginView {
         passwordField.setPromptText("Masukkan password...");
         passwordField.setPrefHeight(42);
 
-        // errorLabel sebagai field class, bukan local variable
         errorLabel = new Label();
         errorLabel.setStyle("-fx-text-fill: #EF4444; -fx-font-size: 12px;");
         errorLabel.setWrapText(true);
@@ -90,17 +89,36 @@ public class LoginView {
         Label footer = new Label("© 2026 Sistem Bank Sampah");
         footer.setStyle("-fx-font-size: 11px; -fx-text-fill: #94A3B8;");
 
+        // ✅ DIPERBAIKI: validasi field kosong + validasi panjang minimum username
         loginBtn.setOnAction(e -> {
             String username = usernameField.getText().trim();
             String password = passwordField.getText().trim();
+
+            // Validasi field kosong (sudah tersedia pada kode asli)
             if (username.isEmpty() || password.isEmpty()) {
                 errorLabel.setText("Username dan password tidak boleh kosong!");
                 return;
             }
+
+            // ✅ TAMBAHAN: validasi panjang minimum username
+            if (username.length() < 3) {
+                errorLabel.setText("Username minimal 3 karakter!");
+                return;
+            }
+
             errorLabel.setText("Menghubungkan...");
             doLogin(username, password);
         });
+
+        // Event Enter pada PasswordField (sudah tersedia pada kode asli)
         passwordField.setOnAction(e -> loginBtn.fire());
+
+        // ✅ TAMBAHAN: sembunyikan pesan error saat pengguna mulai mengetik
+        usernameField.textProperty().addListener((obs, oldVal, newVal) -> {
+            if (errorLabel.isVisible() && !errorLabel.getText().isEmpty()) {
+                errorLabel.setText("");
+            }
+        });
 
         card.getChildren().addAll(
                 logoBox, sep, loginTitle, loginSub,
@@ -120,6 +138,12 @@ public class LoginView {
                     SessionManager.setCurrentUser(u);
                     Platform.runLater(() -> {
                         try {
+                            // ✅ TAMBAHAN: Alert INFORMATION pesan sambutan setelah login berhasil
+                            Alert info = new Alert(Alert.AlertType.INFORMATION,
+                                    "Selamat datang, " + u.getNama() + "!");
+                            info.setTitle("Login Berhasil");
+                            info.showAndWait();
+
                             MainView mainView = new MainView(stage);
                             Scene scene = new Scene(mainView.getView(), 1050, 700);
                             scene.getStylesheets().add(

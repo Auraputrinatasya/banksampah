@@ -5,7 +5,9 @@ import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
+import javafx.scene.control.Alert;
 import javafx.scene.control.Button;
+import javafx.scene.control.ButtonType;
 import javafx.scene.control.Label;
 import javafx.scene.control.Separator;
 import javafx.scene.layout.*;
@@ -33,7 +35,6 @@ public class MainView {
         // =====================================
         // CONTENT AREA
         // =====================================
-        // HARUS DIBUAT DULU SEBELUM setActivePage()
         contentArea = new StackPane();
         contentArea.setStyle("-fx-background-color: #F4F6FA;");
 
@@ -125,37 +126,27 @@ public class MainView {
                     btnLaporan);
 
             // DEFAULT PAGE
-            setActivePage(btnDashboard,
-                    new DashboardView().getView());
-
+            setActivePage(btnDashboard, new DashboardView().getView());
             setActive(btnDashboard);
 
             // ACTION BUTTONS
             btnDashboard.setOnAction(e -> {
-                setActivePage(
-                        btnDashboard,
-                        new DashboardView().getView());
+                setActivePage(btnDashboard, new DashboardView().getView());
                 setActive(btnDashboard);
             });
 
             btnTransaksi.setOnAction(e -> {
-                setActivePage(
-                        btnTransaksi,
-                        new TransaksiView().getView());
+                setActivePage(btnTransaksi, new TransaksiView().getView());
                 setActive(btnTransaksi);
             });
 
             btnJenis.setOnAction(e -> {
-                setActivePage(
-                        btnJenis,
-                        new JenisSampahView().getView());
+                setActivePage(btnJenis, new JenisSampahView().getView());
                 setActive(btnJenis);
             });
 
             btnNasabah.setOnAction(e -> {
-                setActivePage(
-                        btnNasabah,
-                        new NasabahView().getView());
+                setActivePage(btnNasabah, new NasabahView().getView());
                 setActive(btnNasabah);
             });
 
@@ -167,18 +158,11 @@ public class MainView {
 
             navGroup.getChildren().add(btnTransaksi);
 
-            setActivePage(
-                    btnTransaksi,
-                    new TransaksiView().getView());
-
+            setActivePage(btnTransaksi, new TransaksiView().getView());
             setActive(btnTransaksi);
 
             btnTransaksi.setOnAction(e -> {
-
-                setActivePage(
-                        btnTransaksi,
-                        new TransaksiView().getView());
-
+                setActivePage(btnTransaksi, new TransaksiView().getView());
                 setActive(btnTransaksi);
             });
         }
@@ -201,6 +185,7 @@ public class MainView {
                     -fx-cursor: hand;
                 """);
 
+        // ✅ DIPERBAIKI: logout sekarang ada dialog konfirmasi sesuai laporan
         btnLogout.setOnAction(e -> doLogout());
 
         sidebar.getChildren().addAll(
@@ -215,69 +200,64 @@ public class MainView {
     }
 
     private Button navButton(String text) {
-
         Button btn = new Button(text);
-
         btn.getStyleClass().add("nav-btn");
-
         btn.setMaxWidth(Double.MAX_VALUE);
-
         return btn;
     }
 
     private void setActive(Button btn) {
-
         if (activeBtn != null) {
-            activeBtn.getStyleClass()
-                    .remove("nav-btn-active");
+            activeBtn.getStyleClass().remove("nav-btn-active");
         }
-
         btn.getStyleClass().add("nav-btn-active");
-
         activeBtn = btn;
     }
 
     private void setActivePage(Button btn, Parent view) {
-
         if (contentArea != null) {
             contentArea.getChildren().setAll(view);
         }
     }
 
     private void openLaporan() {
-
         try {
-
             java.awt.Desktop.getDesktop().browse(
                     new java.net.URI(
                             com.banksampah.util.ReportServer.getUrl()));
-
         } catch (Exception e) {
             e.printStackTrace();
         }
     }
 
+    // ✅ DIPERBAIKI: doLogout() sekarang menggunakan Alert CONFIRMATION sesuai
+    // laporan
     private void doLogout() {
+        Alert confirm = new Alert(Alert.AlertType.CONFIRMATION,
+                "Yakin ingin keluar dari aplikasi?",
+                ButtonType.YES, ButtonType.NO);
+        confirm.setTitle("Konfirmasi Logout");
+        confirm.showAndWait().ifPresent(btn -> {
+            if (btn == ButtonType.YES) {
+                SessionManager.logout();
 
-        SessionManager.logout();
+                LoginView loginView = new LoginView(stage);
 
-        LoginView loginView = new LoginView(stage);
+                Scene scene = new Scene(
+                        loginView.getView(),
+                        420,
+                        500);
 
-        Scene scene = new Scene(
-                loginView.getView(),
-                420,
-                500);
+                scene.getStylesheets().add(
+                        getClass()
+                                .getResource("/styles.css")
+                                .toExternalForm());
 
-        scene.getStylesheets().add(
-                getClass()
-                        .getResource("/styles.css")
-                        .toExternalForm());
-
-        stage.setScene(scene);
-
-        stage.setResizable(false);
-
-        stage.centerOnScreen();
+                stage.setScene(scene);
+                stage.setResizable(false);
+                stage.centerOnScreen();
+            }
+        });
     }
 
     public Parent getView() {

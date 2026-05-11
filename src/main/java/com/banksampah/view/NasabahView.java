@@ -18,7 +18,9 @@ public class NasabahView {
     private TableView<User> table;
     private final UserDAO dao = new UserDAO();
 
-    public NasabahView() { buildUI(); }
+    public NasabahView() {
+        buildUI();
+    }
 
     private void buildUI() {
         root = new VBox(0);
@@ -69,7 +71,7 @@ public class NasabahView {
         TableColumn<User, String> colAksi = new TableColumn<>("Aksi");
         colAksi.setPrefWidth(150);
         colAksi.setCellFactory(col -> new TableCell<>() {
-            final Button edit  = new Button("✏️ Edit");
+            final Button edit = new Button("✏️ Edit");
             final Button hapus = new Button("🗑️ Hapus");
             {
                 edit.getStyleClass().add("btn-secondary");
@@ -77,20 +79,32 @@ public class NasabahView {
                 hapus.getStyleClass().add("btn-danger");
                 hapus.setStyle("-fx-font-size: 12px; -fx-padding: 5 12;");
             }
-            @Override protected void updateItem(String item, boolean empty) {
+
+            @Override
+            protected void updateItem(String item, boolean empty) {
                 super.updateItem(item, empty);
-                if (empty) { setGraphic(null); return; }
+                if (empty) {
+                    setGraphic(null);
+                    return;
+                }
                 User u = getTableView().getItems().get(getIndex());
-                edit.setOnAction(e -> showDialog(u));
-                hapus.setOnAction(e -> {
-                    Alert c = new Alert(Alert.AlertType.CONFIRMATION, "Hapus " + u.getNama() + "?", ButtonType.YES, ButtonType.NO);
-                    c.showAndWait().ifPresent(b -> {
-                        if (b == ButtonType.YES) {
-                            try { dao.delete(u.getIdUser()); loadData(); }
-                            catch (Exception ex) { new Alert(Alert.AlertType.ERROR, ex.getMessage()).show(); }
-                        }
+
+                // ✅ DIPERBAIKI: Konfirmasi sebelum membuka form edit
+                edit.setOnAction(e -> {
+                    Alert confirm = new Alert(Alert.AlertType.CONFIRMATION,
+                            "Edit data nasabah: " + u.getNama() + "?",
+                            ButtonType.YES, ButtonType.NO);
+                    confirm.setTitle("Konfirmasi Edit");
+                    confirm.setHeaderText("Perubahan akan tersimpan langsung ke basis data.");
+                    confirm.showAndWait().ifPresent(btn -> {
+                        if (btn == ButtonType.YES)
+                            showDialog(u);
                     });
                 });
+
+                // ✅ DIPERBAIKI: Konfirmasi hapus dengan pesan yang lebih informatif
+                hapus.setOnAction(e -> deleteNasabah(u));
+
                 HBox box = new HBox(6, edit, hapus);
                 box.setAlignment(Pos.CENTER_LEFT);
                 setGraphic(box);
@@ -107,8 +121,31 @@ public class NasabahView {
     }
 
     private void loadData() {
-        try { table.setItems(FXCollections.observableArrayList(dao.getAll())); }
-        catch (Exception e) { new Alert(Alert.AlertType.ERROR, e.getMessage()).show(); }
+        try {
+            table.setItems(FXCollections.observableArrayList(dao.getAll()));
+        } catch (Exception e) {
+            showAlert("Error", e.getMessage());
+        }
+    }
+
+    // ✅ DIPERBAIKI: Metode hapus nasabah dengan konfirmasi sesuai laporan
+    private void deleteNasabah(User n) {
+        Alert confirm = new Alert(Alert.AlertType.CONFIRMATION,
+                "Hapus nasabah '" + n.getNama() + "' (Username: " + n.getUsername() + ")?",
+                ButtonType.YES, ButtonType.NO);
+        confirm.setTitle("Konfirmasi Hapus");
+        confirm.setHeaderText("Tindakan ini tidak dapat dibatalkan!");
+        confirm.showAndWait().ifPresent(btn -> {
+            if (btn == ButtonType.YES) {
+                try {
+                    dao.delete(n.getIdUser());
+                    showInfo("Berhasil", "Nasabah '" + n.getNama() + "' berhasil dihapus.");
+                    loadData();
+                } catch (Exception ex) {
+                    showAlert("Error Hapus", "Gagal menghapus: " + ex.getMessage());
+                }
+            }
+        });
     }
 
     private void showDialog(User existing) {
@@ -120,14 +157,21 @@ public class NasabahView {
         root.setPadding(new Insets(24));
         root.setStyle("-fx-background-color: #F8FAFC;");
 
-        TextField txtNama     = new TextField(); txtNama.setPromptText("Nama lengkap");
-        TextField txtUsername = new TextField(); txtUsername.setPromptText("Username");
-        PasswordField txtPass = new PasswordField(); txtPass.setPromptText("Password (kosongkan jika tidak ganti)");
+        TextField txtNama = new TextField();
+        txtNama.setPromptText("Nama lengkap");
+        TextField txtUsername = new TextField();
+        txtUsername.setPromptText("Username");
+        PasswordField txtPass = new PasswordField();
+        txtPass.setPromptText("Password (kosongkan jika tidak ganti)");
         ComboBox<String> cmbRole = new ComboBox<>(FXCollections.observableArrayList("user", "admin"));
         cmbRole.setValue("user");
         cmbRole.setMaxWidth(Double.MAX_VALUE);
-        TextField txtTelp  = new TextField(); txtTelp.setPromptText("No. Telepon");
-        TextArea txtAlamat = new TextArea(); txtAlamat.setPromptText("Alamat"); txtAlamat.setPrefRowCount(2);
+        // ✅ DIPERBAIKI: prompt text disesuaikan dengan validasi (angka 10-13 digit)
+        TextField txtTelp = new TextField();
+        txtTelp.setPromptText("No. Telepon (10-13 digit angka)");
+        TextArea txtAlamat = new TextArea();
+        txtAlamat.setPromptText("Alamat");
+        txtAlamat.setPrefRowCount(2);
 
         if (existing != null) {
             txtNama.setText(existing.getNama());
@@ -141,33 +185,76 @@ public class NasabahView {
         btnSimpan.getStyleClass().add("btn-primary");
         btnSimpan.setMaxWidth(Double.MAX_VALUE);
         btnSimpan.setOnAction(e -> {
-            if (txtNama.getText().isEmpty() || txtUsername.getText().isEmpty()) {
-                new Alert(Alert.AlertType.WARNING, "Nama dan username wajib diisi!").show(); return;
+            String nama = txtNama.getText().trim();
+            String username = txtUsername.getText().trim();
+            String noHp = txtTelp.getText().trim();
+            String alamat = txtAlamat.getText().trim();
+
+            // ✅ DIPERBAIKI: Validasi field kosong sesuai laporan
+            if (nama.isEmpty()) {
+                showAlert("Validasi", "Nama nasabah tidak boleh kosong!");
+                return;
             }
+            if (username.isEmpty()) {
+                showAlert("Validasi", "Username tidak boleh kosong!");
+                return;
+            }
+            if (noHp.isEmpty()) {
+                showAlert("Validasi", "Nomor HP tidak boleh kosong!");
+                return;
+            }
+            if (alamat.isEmpty()) {
+                showAlert("Validasi", "Alamat tidak boleh kosong!");
+                return;
+            }
+
+            // ✅ DIPERBAIKI: Validasi format No. HP — hanya angka, panjang 10-13 karakter
+            if (!noHp.matches("\\d{10,13}")) {
+                showAlert("Validasi", "Nomor HP harus berupa angka (10-13 digit)!");
+                return;
+            }
+
+            // Validasi password untuk nasabah baru
+            if (existing == null) {
+                if (txtPass.getText().isEmpty()) {
+                    showAlert("Validasi", "Password wajib diisi untuk nasabah baru!");
+                    return;
+                }
+            }
+
             try {
                 User u = existing != null ? existing : new User();
-                u.setNama(txtNama.getText()); u.setUsername(txtUsername.getText());
-                u.setRole(cmbRole.getValue()); u.setNoTelp(txtTelp.getText()); u.setAlamat(txtAlamat.getText());
+                u.setNama(nama);
+                u.setUsername(username);
+                u.setRole(cmbRole.getValue());
+                u.setNoTelp(noHp);
+                u.setAlamat(alamat);
+
                 if (existing == null) {
-                    if (txtPass.getText().isEmpty()) { new Alert(Alert.AlertType.WARNING, "Password wajib diisi untuk nasabah baru!").show(); return; }
-                    u.setPassword(txtPass.getText()); dao.insert(u);
+                    u.setPassword(txtPass.getText());
+                    dao.insert(u);
+                    showInfo("Sukses", "Nasabah berhasil didaftarkan!");
                 } else {
-                    if (!txtPass.getText().isEmpty()) u.setPassword(txtPass.getText());
+                    if (!txtPass.getText().isEmpty())
+                        u.setPassword(txtPass.getText());
                     dao.update(u);
+                    showInfo("Sukses", "Data nasabah berhasil diperbarui!");
                 }
-                loadData(); dialog.close();
-            } catch (Exception ex) { new Alert(Alert.AlertType.ERROR, ex.getMessage()).show(); }
+                loadData();
+                dialog.close();
+            } catch (Exception ex) {
+                showAlert("Error", ex.getMessage());
+            }
         });
 
         root.getChildren().addAll(
-            new Label("Nama:"), txtNama,
-            new Label("Username:"), txtUsername,
-            new Label("Password:"), txtPass,
-            new Label("Role:"), cmbRole,
-            new Label("No. Telp:"), txtTelp,
-            new Label("Alamat:"), txtAlamat,
-            btnSimpan
-        );
+                new Label("Nama:"), txtNama,
+                new Label("Username:"), txtUsername,
+                new Label("Password:"), txtPass,
+                new Label("Role:"), cmbRole,
+                new Label("No. Telp:"), txtTelp,
+                new Label("Alamat:"), txtAlamat,
+                btnSimpan);
 
         ScrollPane sp = new ScrollPane(root);
         sp.setFitToWidth(true);
@@ -177,5 +264,20 @@ public class NasabahView {
         dialog.show();
     }
 
-    public Parent getView() { return root; }
+    // ✅ DIPERBAIKI: Helper methods showAlert() dan showInfo() sesuai laporan
+    private void showAlert(String title, String msg) {
+        Alert a = new Alert(Alert.AlertType.ERROR, msg);
+        a.setTitle(title);
+        a.showAndWait();
+    }
+
+    private void showInfo(String title, String msg) {
+        Alert a = new Alert(Alert.AlertType.INFORMATION, msg);
+        a.setTitle(title);
+        a.showAndWait();
+    }
+
+    public Parent getView() {
+        return root;
+    }
 }
